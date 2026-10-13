@@ -1,0 +1,196 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+@import "tailwindcss";
+
+@variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-display: 'Space Grotesk', sans-serif;
+  
+  --color-saffron-primary: #D97706;
+  --color-saffron-dark: #B45309;
+  --color-saffron-light: #FEF3C7;
+  --color-gold-accent: #D4AF37;
+  --color-temple-red: #B91C1C;
+  --color-temple-sand: #FFFFFF;
+  --color-temple-sand-dark: #F8F6F0;
+  --color-temple-card: #FFFFFF;
+  --color-temple-border: #E8E2D9;
+  --color-text-primary: #1F1916;
+  --color-text-secondary: #786C65;
+  --color-royal-blue: #1E3A8A;
+  --color-status-green: #15803D;
+  --color-status-green-light: #DCFCE7;
+}
+
+@layer base {
+  body {
+    font-family: var(--font-sans);
+    background-color: #FFFFFF;
+    color: #1F1916;
+  }
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+/* Modern Temple Architectural Design System Utilities */
+.temple-card {
+  background-color: #FFFFFF;
+  border: 1px solid #E8E2D9;
+  border-radius: 20px;
+  box-shadow: 0 4px 20px -2px rgba(217, 119, 6, 0.05), 0 2px 6px -1px rgba(31, 25, 22, 0.03);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.temple-card:hover {
+  box-shadow: 0 12px 28px -4px rgba(217, 119, 6, 0.09), 0 4px 12px -2px rgba(31, 25, 22, 0.05);
+}
+
+.temple-hero-card {
+  background: linear-gradient(135deg, #FFFFFF 0%, #FAF6EE 50%, #F5EFE3 100%);
+  border: 1px solid #E8DECE;
+  border-radius: 24px;
+  box-shadow: 0 10px 30px -5px rgba(217, 119, 6, 0.08);
+}
+
+.temple-arch-border {
+  border-top-left-radius: 28px;
+  border-top-right-radius: 28px;
+  border-bottom-left-radius: 20px;
+  border-bottom-right-radius: 20px;
+}
+
+/* Lotus Subtle Pattern SVG Overlay */
+.lotus-pattern-bg {
+  background-image: radial-gradient(rgba(217, 119, 6, 0.07) 1px, transparent 0);
+  background-size: 24px 24px;
+}
+
+.gold-gradient-text {
+  background: linear-gradient(135deg, #B45309 0%, #D97706 50%, #D4AF37 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.royal-blue-gradient {
+  background: linear-gradient(135deg, #1E3A8A 0%, #2563EB 100%);
+}
+
+.saffron-gold-gradient {
+  background: linear-gradient(135deg, #D97706 0%, #B45309 100%);
+}
+
+/* Smooth custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #FAF8F5;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #D9D2C7;
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #B4A999;
+}
+
+/* Precise thermal & sticker sheet print styles */
+@media print {
+  /* When printing barcodes/labels specifically */
+  body.print-labels-only > *:not(.active-print-element) {
+    display: none !important;
+  }
+  
+  body.print-labels-only {
+    background: #FFFFFF !important;
+    background-color: #FFFFFF !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    width: 100% !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  body.print-labels-only .active-print-element {
+    display: block !important;
+    visibility: visible !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    background: #FFFFFF !important;
+  }
+
+  body.print-labels-only .active-print-element * {
+    visibility: visible !important;
+    color: #000000 !important;
+    color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  /* When printing receipts specifically */
+  body.print-receipt-only > *:not(.active-print-element) {
+    display: none !important;
+  }
+  
+  body.print-receipt-only {
+    background: #FFFFFF !important;
+    background-color: #FFFFFF !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    width: 80mm !important; /* Standard receipt roll size */
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  body.print-receipt-only .active-print-element {
+    display: block !important;
+    visibility: visible !important;
+    width: 80mm !important;
+    max-width: 80mm !important;
+    margin: 0 auto !important;
+    padding: 4mm !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    background: #FFFFFF !important;
+  }
+
+  body.print-receipt-only .active-print-element * {
+    visibility: visible !important;
+    color: #000000 !important;
+    background-color: transparent !important;
+    color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  /* Prevent page splitting inside stickers */
+  .print-sticker {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    page-break-after: auto !important;
+    box-shadow: none !important;
+    border: 1.5px solid #000000 !important;
+    background-color: #FFFFFF !important;
+    color: #000000 !important;
+  }
+}

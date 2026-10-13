@@ -1,0 +1,294 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
+}
+
+model Branch {
+  id          String    @id
+  code        String    @unique
+  name        String
+  location    String
+  city        String
+  state       String
+  phone       String?
+  email       String?
+  isMain      Boolean   @default(false) @map("is_main")
+  status      String    @default("active")
+  managerName String?   @map("manager_name")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@map("branches")
+}
+
+model Product {
+  id            String    @id
+  sku           String    @unique
+  name          String
+  category      String
+  price         Float
+  cost          Float
+  stock         Int
+  minStock      Int       @map("min_stock")
+  warehouseZone String    @map("warehouse_zone")
+  batchNo       String?   @map("batch_no")
+  barcode       String?   @unique
+  imageUrl      String?   @map("image_url")
+  status        String
+  lastUpdated   DateTime  @default(now()) @map("last_updated")
+  supplier      String?
+  rating        Float?
+  branchId      String?   @map("branch_id")
+  branchName    String?   @map("branch_name")
+  description   String?
+  tags          String[]
+  isDeleted     Boolean   @default(false) @map("is_deleted")
+  deletedAt     DateTime? @map("deleted_at")
+  deletedBy     String?   @map("deleted_by")
+
+  @@map("products")
+}
+
+model WarehouseZone {
+  id                      String  @id
+  code                    String  @unique
+  name                    String
+  description             String?
+  capacityLimit           Int     @default(1000) @map("capacity_limit")
+  currentOccupancyPercent Int     @default(0) @map("current_occupancy_percent")
+  managerInCharge         String? @map("manager_in_charge")
+  securityLevel           String? @default("Standard") @map("security_level")
+  branchId                String? @map("branch_id")
+  branchName              String? @map("branch_name")
+
+  @@map("warehouse_zones")
+}
+
+model MaterialInwardNote {
+  id          String                   @id
+  grnNumber   String                   @unique @map("grn_number")
+  poNumber    String?                  @map("po_number")
+  vendorName  String                   @map("vendor_name")
+  invoiceDate String?                  @map("invoice_date")
+  warehouse   String?
+  branchId    String?                  @map("branch_id")
+  branchName  String?                  @map("branch_name")
+  status      String                   @default("completed")
+  totalValue  Float                    @default(0.0) @map("total_value")
+  receivedBy  String?                  @map("received_by")
+  timestamp   String?
+  notes       String?
+  isDeleted   Boolean                  @default(false) @map("is_deleted")
+  deletedAt   DateTime?                @map("deleted_at")
+  deletedBy   String?                  @map("deleted_by")
+  items       MaterialInwardNoteItem[]
+
+  @@map("material_inward_notes")
+}
+
+model MaterialInwardNoteItem {
+  id           String             @id @default(uuid())
+  sku          String
+  name         String
+  quantity     Int
+  unitCost     Float              @map("unit_cost")
+  sellingPrice Float?             @map("selling_price")
+  batchNo      String?            @map("batch_no")
+  expiryDate   String?            @map("expiry_date")
+  taxRate      Float              @map("tax_rate")
+  total        Float
+  inwardNoteId String             @map("inward_note_id")
+  inwardNote   MaterialInwardNote @relation(fields: [inwardNoteId], references: [id], onDelete: Cascade)
+
+  @@map("material_inward_note_items")
+}
+
+model POSOrder {
+  id             String         @id
+  orderNumber    String         @unique @map("order_number")
+  subtotal       Float
+  discountAmount Float          @default(0.0) @map("discount_amount")
+  taxAmount      Float          @default(0.0) @map("tax_amount")
+  total          Float
+  paymentMethod  String         @map("payment_method")
+  timestamp      String?
+  cashierName    String?        @map("cashier_name")
+  branchId       String?        @map("branch_id")
+  branchName     String?        @map("branch_name")
+  customerPhone  String?        @map("customer_phone")
+  customerName   String?        @map("customer_name")
+  salesTag       String?        @map("sales_tag")
+  upiId          String?        @map("upi_id")
+  isDeleted      Boolean        @default(false) @map("is_deleted")
+  deletedAt      DateTime?      @map("deleted_at")
+  deletedBy      String?        @map("deleted_by")
+  items          POSOrderItem[]
+
+  @@map("pos_orders")
+}
+
+model POSOrderItem {
+  id              String   @id @default(uuid())
+  productId       String   @map("product_id")
+  productSku      String   @map("product_sku")
+  productName     String   @map("product_name")
+  productCategory String   @map("product_category")
+  productPrice    Float    @map("product_price")
+  quantity        Int
+  discountPercent Float    @default(0.0) @map("discount_percent")
+  customNote      String?  @map("custom_note")
+  orderId         String   @map("order_id")
+  order           POSOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("pos_order_items")
+}
+
+model SalesEvent {
+  id               String    @id
+  name             String
+  type             String
+  startDate        String?   @map("start_date")
+  endDate          String?   @map("end_date")
+  status           String    @default("active")
+  targetRevenue    Float     @default(0.0) @map("target_revenue")
+  currentRevenue   Float     @default(0.0) @map("current_revenue")
+  allocatedSKUs    Int       @default(10) @map("allocated_skus")
+  discountRule     String?   @map("discount_rule")
+  description      String?
+  bannerColor      String?   @default("bg-indigo-600") @map("banner_color")
+  stallLocation    String?   @map("stall_location")
+  managerName      String?   @map("manager_name")
+  branchId         String?   @map("branch_id")
+  branchName       String?   @map("branch_name")
+  booksSoldQty     Int?      @default(0) @map("books_sold_qty")
+  booksSoldRevenue Float?    @default(0.0) @map("books_sold_revenue")
+  giftsSoldQty     Int?      @default(0) @map("gifts_sold_qty")
+  giftsSoldRevenue Float?    @default(0.0) @map("gifts_sold_revenue")
+  isDeleted        Boolean   @default(false) @map("is_deleted")
+  deletedAt        DateTime? @map("deleted_at")
+  deletedBy        String?   @map("deleted_by")
+
+  @@map("sales_events")
+}
+
+model EventAllocation {
+  id           String   @id
+  eventId      String   @map("event_id")
+  sku          String
+  productName  String   @map("product_name")
+  category     String
+  allocatedQty Int      @map("allocated_qty")
+  soldQty      Int      @default(0) @map("sold_qty")
+  damagedQty   Int      @default(0) @map("damaged_qty")
+  returnedQty  Int      @default(0) @map("returned_qty")
+  price        Float
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("event_allocations")
+}
+
+model EventTransaction {
+  id             String   @id
+  eventId        String   @map("event_id")
+  orderNumber    String   @map("order_number")
+  items          Json
+  subtotal       Float
+  taxAmount      Float    @default(0.0) @map("tax_amount")
+  discountAmount Float    @default(0.0) @map("discount_amount")
+  total          Float
+  paymentMethod  String   @map("payment_method")
+  timestamp      DateTime @default(now())
+  cashierName    String?  @map("cashier_name")
+
+  @@map("event_transactions")
+}
+
+model BarcodeRecord {
+  id           String  @id
+  productName  String  @map("product_name")
+  sku          String
+  barcodeValue String  @map("barcode_value")
+  batchNo      String? @map("batch_no")
+  format       String? @map("format") @default("code128")
+  generatedAt  String? @map("generated_at")
+  template     String?
+  printCount   Int?    @default(1) @map("print_count")
+
+  @@map("barcode_records")
+}
+
+model SystemSetting {
+  id             String   @id @default("settings")
+  logoUrl        String?  @map("logo_url")
+  orgName        String   @default("ISKCON Foundation") @map("org_name")
+  appTitle       String   @default("ISKCON Retail ERP") @map("app_title")
+  brandingColor  String   @default("#D97706") @map("branding_color")
+  currencySymbol String   @default("₹") @map("currency_symbol")
+  taxId          String?  @map("tax_id")
+  address        String?
+  phone          String?
+  email          String?
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("system_settings")
+}
+
+model User {
+  id                  String    @id @default(uuid())
+  name                String
+  email               String    @unique
+  role                String
+  avatar              String?
+  branch              String?
+  branchId            String?   @map("branch_id")
+  accessibleBranchIds String[]  @map("accessible_branch_ids")
+  shift               String?
+  isActive            Boolean   @default(true) @map("is_active")
+  permissions         String[]
+  password            String
+  isDeleted           Boolean   @default(false) @map("is_deleted")
+  deletedAt           DateTime? @map("deleted_at")
+  deletedBy           String?   @map("deleted_by")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  userId      String?  @map("user_id")
+  staffName   String   @map("staff_name")
+  role        String
+  branch      String?
+  branchId    String?  @map("branch_id")
+  action      String
+  module      String
+  referenceNo String?  @map("reference_no")
+  details     String?
+  timestamp   DateTime @default(now())
+
+  @@map("audit_logs")
+}
+
+model StockMovement {
+  id          String   @id @default(uuid())
+  type        String // e.g. 'inward_grn', 'pos_sale', 'stock_adjustment', 'zone_transfer', 'return'
+  sku         String
+  productName String   @map("product_name")
+  qtyDelta    Int      @map("qty_delta")
+  fromZone    String?  @map("from_zone")
+  toZone      String?  @map("to_zone")
+  branchId    String?  @map("branch_id")
+  branchName  String?  @map("branch_name")
+  timestamp   DateTime @default(now())
+  operator    String?
+  referenceNo String?  @map("reference_no")
+  batchNo     String?  @map("batch_no")
+
+  @@map("stock_movements")
+}

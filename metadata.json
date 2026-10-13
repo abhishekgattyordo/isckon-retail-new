@@ -1,0 +1,10 @@
+{
+  "name": "ISKCON Retail ERP",
+  "description": "Enterprise Retail ERP suite for ISKCON temple gift shops and Govinda's stores featuring POS Checkout, Inventory & Barcode Management, Material Inward Notes (GRN), and Sales Events.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
