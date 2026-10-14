@@ -1,7 +1,7 @@
-import { prisma } from '../prisma.ts';
-import { MemoryDb } from '../dbStore.ts';
-import { Product } from '../../types.ts';
-import { INITIAL_PRODUCTS } from '../../data/initialData.ts';
+import { prisma } from '../prisma.js';
+import { MemoryDb } from '../dbStore.js';
+import { Product } from '../../types.js';
+import { INITIAL_PRODUCTS } from '../../data/initialData.js';
 
 if (MemoryDb.products.length === 0) {
   MemoryDb.products = [...INITIAL_PRODUCTS];

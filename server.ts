@@ -4,12 +4,12 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
 
-import { MemoryDb } from './src/lib/dbStore.ts';
-import { getProducts, createProduct, updateProductService, softDeleteProductService, permanentDeleteProductService, restoreProductService } from './src/lib/services/productService.ts';
-import { getBranches, createBranch, updateBranch, deleteBranch } from './src/lib/services/branchService.ts';
-import { getUsers, createUser, updateUserService, softDeleteUserService, permanentDeleteUserService, restoreUserService } from './src/lib/services/userService.ts';
-import { getInwardNotes, createInwardNote, softDeleteInwardNoteService, permanentDeleteInwardNoteService, restoreInwardNoteService } from './src/lib/services/inwardService.ts';
-import { getOrders, createOrder } from './src/lib/services/orderService.ts';
+import { MemoryDb } from './src/lib/dbStore.js';
+import { getProducts, createProduct, updateProductService, softDeleteProductService, permanentDeleteProductService, restoreProductService } from './src/lib/services/productService.js';
+import { getBranches, createBranch, updateBranch, deleteBranch } from './src/lib/services/branchService.js';
+import { getUsers, createUser, updateUserService, softDeleteUserService, permanentDeleteUserService, restoreUserService } from './src/lib/services/userService.js';
+import { getInwardNotes, createInwardNote, softDeleteInwardNoteService, permanentDeleteInwardNoteService, restoreInwardNoteService } from './src/lib/services/inwardService.js';
+import { getOrders, createOrder } from './src/lib/services/orderService.js';
 import {
   getEvents,
   createEvent,
@@ -22,18 +22,18 @@ import {
   deleteEventAllocation,
   getEventTransactions,
   createEventTransaction
-} from './src/lib/services/eventService.ts';
-import { getSettings, updateSettings, DEFAULT_SETTINGS } from './src/lib/services/settingsService.ts';
-import { getAuditLogs, createAuditLog, getStockMovements, createStockMovement } from './src/lib/services/auditService.ts';
+} from './src/lib/services/eventService.js';
+import { getSettings, updateSettings, DEFAULT_SETTINGS } from './src/lib/services/settingsService.js';
+import { getAuditLogs, createAuditLog, getStockMovements, createStockMovement } from './src/lib/services/auditService.js';
 import {
   getAllRecycleBinItems,
   restoreRecycleItemService,
   permanentDeleteRecycleItemService,
   emptyRecycleBinService
-} from './src/lib/services/recycleBinService.ts';
-import { getWarehouseZones, createWarehouseZone } from './src/lib/services/zoneService.ts';
-import { getReportsSummary } from './src/lib/services/reportService.ts';
-import { RecycleItemType } from './src/types.ts';
+} from './src/lib/services/recycleBinService.js';
+import { getWarehouseZones, createWarehouseZone } from './src/lib/services/zoneService.js';
+import { getReportsSummary } from './src/lib/services/reportService.js';
+import { RecycleItemType } from './src/types.js';
 
 dotenv.config();
 
