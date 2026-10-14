@@ -1,4 +1,4 @@
-import { Branch, Product, MaterialInwardNote, POSOrder, SalesEvent, SystemSettings, AuditLog, StockMovement, SalesTag, UserProfile, WarehouseZone, EventAllocation, EventTransaction } from '../types';
+import { Branch, Product, MaterialInwardNote, POSOrder, SalesEvent, SystemSettings, AuditLog, StockMovement, SalesTag, UserProfile, WarehouseZone, EventAllocation, EventTransaction } from '../types.ts';
 
 // Central in-memory DB store for Next.js API Routes fallback
 export class MemoryDb {
