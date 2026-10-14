@@ -19,7 +19,8 @@ import {
   SystemSettings,
   AuditLog,
   RecycleBinItem,
-  RecycleItemType
+  RecycleItemType,
+  Supplier
 } from '../types';
 import {
   INITIAL_BRANCHES,
@@ -35,7 +36,8 @@ import {
   INITIAL_BARCODES,
   INITIAL_BATCHES,
   INITIAL_AUDIT_LOGS,
-  INITIAL_SALES_TAGS
+  INITIAL_SALES_TAGS,
+  INITIAL_SUPPLIERS
 } from '../data/initialData';
 import { GLOBAL_ALL_BRANCHES, isSuperAdmin, isBranchAdmin, getDefaultPermissionsForRole } from '../lib/authUtils';
 import { isProductInZone } from '../lib/warehouseUtils';
@@ -56,6 +58,10 @@ interface ERPContextType {
   deleteProduct: (id: string) => void;
   inwardNotes: MaterialInwardNote[];
   addInwardNote: (note: Omit<MaterialInwardNote, 'id'>) => void;
+  suppliers: Supplier[];
+  addSupplier: (supplier: Supplier) => void;
+  updateSupplier: (supplier: Supplier) => void;
+  deleteSupplier: (id: string) => void;
   batches: InventoryBatch[];
   setBatches: React.Dispatch<React.SetStateAction<InventoryBatch[]>>;
   zones: WarehouseZone[];
@@ -87,11 +93,12 @@ interface ERPContextType {
   updateUser: (id: string, updates: Partial<UserProfile>) => void;
   deleteUser: (id: string) => void;
   cart: CartItem[];
-  addToCart: (product: Product, quantity?: number) => void;
+  addToCart: (product: Product, quantity?: number, batchInfo?: { batchId?: string; batchNo?: string; unitPrice?: number; purchaseCost?: number }) => void;
   removeFromCart: (productId: string) => void;
   updateCartQuantity: (productId: string, quantity: number) => void;
   updateCartDiscount: (productId: string, discount: number) => void;
   clearCart: () => void;
+  getActiveProductPrice: (product: Product) => number;
   isSearchModalOpen: boolean;
   setIsSearchModalOpen: (open: boolean) => void;
   theme: 'light' | 'dark' | 'system';
@@ -285,7 +292,72 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [allProducts, setAllProducts] = useState<Product[]>(INITIAL_PRODUCTS);
   const [allInwardNotes, setAllInwardNotes] = useState<MaterialInwardNote[]>(INITIAL_INWARD_NOTES);
-  const [batches, setBatches] = useState<InventoryBatch[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('iskcon_erp_suppliers');
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        } catch (e) {}
+      }
+    }
+    return INITIAL_SUPPLIERS;
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('iskcon_erp_suppliers', JSON.stringify(suppliers));
+    }
+  }, [suppliers]);
+
+  const addSupplier = (sup: Supplier) => {
+    setSuppliers(prev => [sup, ...prev]);
+  };
+
+  const updateSupplier = (sup: Supplier) => {
+    setSuppliers(prev => prev.map(s => s.id === sup.id ? sup : s));
+  };
+
+  const deleteSupplier = (id: string) => {
+    setSuppliers(prev => prev.filter(s => s.id !== id));
+  };
+  const [batches, setBatches] = useState<InventoryBatch[]>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('iskcon_erp_batches');
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+    return INITIAL_PRODUCTS.map((p, idx) => ({
+      id: `bat-opening-${p.id}`,
+      sku: p.sku,
+      batchNo: p.batchNo || `BAT-OPENING-${idx + 1}`,
+      receivedDate: '2025-01-01',
+      edition: 'Standard Edition',
+      costPrice: p.cost,
+      sellingPrice: p.price,
+      totalQuantity: p.stock,
+      remainingQuantity: p.stock,
+      status: p.stock > 0 ? 'in_stock' : 'out_of_stock',
+      grnNumber: 'OPENING-STOCK'
+    }));
+  });
+
+  const getActiveProductPrice = (product: Product): number => {
+    const activeBatches = batches
+      .filter(b => b.sku === product.sku && b.remainingQuantity > 0)
+      .sort((a, b) => a.receivedDate.localeCompare(b.receivedDate));
+    if (activeBatches.length > 0) {
+      return activeBatches[0].sellingPrice;
+    }
+    return product.price;
+  };
   const [allZones, setAllZones] = useState<WarehouseZone[]>(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('iskcon_erp_zones');
@@ -1122,9 +1194,6 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             return {
               ...p,
               stock: newStock,
-              cost: item.unitCost > 0 ? item.unitCost : p.cost,
-              price: item.sellingPrice && item.sellingPrice > 0 ? item.sellingPrice : p.price,
-              batchNo: item.batchNo || p.batchNo,
               status: newStock <= p.minStock ? 'low_stock' : 'in_stock',
               lastUpdated: new Date().toISOString()
             };
@@ -1133,9 +1202,10 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         })
       );
 
-      // Create a new inventory batch
+      // Create a new inventory batch with explicit cost and selling price
+      const batchId = item.batchId || `bat-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
       const newBatch: InventoryBatch = {
-        id: `bat-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        id: batchId,
         sku: item.sku,
         batchNo: item.batchNo || `BAT-${newNote.invoiceDate ? newNote.invoiceDate.slice(0, 4) : new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`,
         receivedDate: newNote.invoiceDate || new Date().toISOString().slice(0, 10),
@@ -1200,13 +1270,21 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       body: JSON.stringify(newOrder)
     }).catch(e => console.warn('Could not post POS order:', e));
 
-    // Deduct stock
+    // Deduct stock following FIFO or specified batch priority
     newOrder.items.forEach(cartItem => {
-      // FIFO Batch-wise inventory tracking deduction
       setBatches(prevBatches => {
-        const skuBatches = prevBatches
-          .filter(b => b.sku === cartItem.product.sku && b.remainingQuantity > 0)
-          .sort((a, b) => a.receivedDate.localeCompare(b.receivedDate));
+        let skuBatches = [...prevBatches].filter(b => b.sku === cartItem.product.sku && b.remainingQuantity > 0);
+        
+        // If cartItem has specific batchId, prioritize that batch first, then follow receivedDate ascending (FIFO)
+        if (cartItem.batchId) {
+          skuBatches.sort((a, b) => {
+            if (a.id === cartItem.batchId) return -1;
+            if (b.id === cartItem.batchId) return 1;
+            return a.receivedDate.localeCompare(b.receivedDate);
+          });
+        } else {
+          skuBatches.sort((a, b) => a.receivedDate.localeCompare(b.receivedDate));
+        }
 
         let qtyNeeded = cartItem.quantity;
         const deductions: Record<string, number> = {};
@@ -1348,15 +1426,54 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const addToCart = (product: Product, quantity = 1) => {
+  const addToCart = (
+    product: Product,
+    quantity = 1,
+    batchInfo?: { batchId?: string; batchNo?: string; unitPrice?: number; purchaseCost?: number }
+  ) => {
+    let resolvedPrice = batchInfo?.unitPrice;
+    let resolvedBatchId = batchInfo?.batchId;
+    let resolvedBatchNo = batchInfo?.batchNo;
+    let resolvedPurchaseCost = batchInfo?.purchaseCost;
+
+    if (resolvedPrice === undefined) {
+      // Default to oldest active available batch price (FIFO priority)
+      const activeBatches = batches
+        .filter(b => b.sku === product.sku && b.remainingQuantity > 0)
+        .sort((a, b) => a.receivedDate.localeCompare(b.receivedDate));
+      if (activeBatches.length > 0) {
+        resolvedPrice = activeBatches[0].sellingPrice;
+        resolvedBatchId = activeBatches[0].id;
+        resolvedBatchNo = activeBatches[0].batchNo;
+        resolvedPurchaseCost = activeBatches[0].costPrice;
+      } else {
+        resolvedPrice = product.price;
+        resolvedPurchaseCost = product.cost;
+        resolvedBatchNo = product.batchNo;
+      }
+    }
+
     setCart(prev => {
-      const existing = prev.find(item => item.product.id === product.id);
-      if (existing) {
-        return prev.map(item =>
-          item.product.id === product.id ? { ...item, quantity: item.quantity + quantity } : item
+      const existingIndex = prev.findIndex(item =>
+        item.product.id === product.id && (resolvedBatchId ? item.batchId === resolvedBatchId : item.batchNo === resolvedBatchNo)
+      );
+      if (existingIndex > -1) {
+        return prev.map((item, idx) =>
+          idx === existingIndex ? { ...item, quantity: item.quantity + quantity } : item
         );
       }
-      return [...prev, { product, quantity, discountPercent: 0 }];
+      return [
+        ...prev,
+        {
+          product: { ...product, price: resolvedPrice! },
+          quantity,
+          discountPercent: 0,
+          batchId: resolvedBatchId,
+          batchNo: resolvedBatchNo,
+          unitPrice: resolvedPrice,
+          purchaseCost: resolvedPurchaseCost
+        }
+      ];
     });
   };
 
@@ -2047,8 +2164,13 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteProduct,
         inwardNotes,
         addInwardNote,
+        suppliers,
+        addSupplier,
+        updateSupplier,
+        deleteSupplier,
         batches,
         setBatches,
+        getActiveProductPrice,
         zones,
         addZone,
         updateZone,

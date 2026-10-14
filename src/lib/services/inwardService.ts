@@ -71,6 +71,40 @@ export async function getDeletedInwardNotes(): Promise<MaterialInwardNote[]> {
 }
 
 export async function createInwardNote(noteData: Omit<MaterialInwardNote, 'id'>): Promise<MaterialInwardNote> {
+  // Strict Backend Validations
+  if (!noteData.vendorName || !noteData.vendorName.trim()) {
+    throw new Error('Validation Error: Supplier / Vendor Name is mandatory.');
+  }
+  if (!noteData.poNumber || !noteData.poNumber.trim()) {
+    throw new Error('Validation Error: Purchase Order (PO) Number is mandatory.');
+  }
+  if (!noteData.warehouse || !noteData.warehouse.trim()) {
+    throw new Error('Validation Error: Destination Warehouse Zone is mandatory.');
+  }
+  if (!noteData.items || !Array.isArray(noteData.items) || noteData.items.length === 0) {
+    throw new Error('Validation Error: At least one product item row is mandatory for a Goods Received Note.');
+  }
+
+  // Validate each item row
+  for (let i = 0; i < noteData.items.length; i++) {
+    const item = noteData.items[i];
+    const rowNum = i + 1;
+    if (!item.sku || !item.sku.trim() || item.sku === 'SKU-UNASSIGNED') {
+      throw new Error(`Validation Error on Row #${rowNum}: Product SKU selection is mandatory.`);
+    }
+    if (!item.name || !item.name.trim() || item.name === 'General Merchandise Item') {
+      throw new Error(`Validation Error on Row #${rowNum}: Product Name is mandatory.`);
+    }
+    const qty = Number(item.quantity);
+    if (isNaN(qty) || qty <= 0) {
+      throw new Error(`Validation Error on Row #${rowNum} (${item.sku}): Quantity is mandatory and must be greater than 0.`);
+    }
+    const cost = Number(item.unitCost);
+    if (isNaN(cost) || cost < 0) {
+      throw new Error(`Validation Error on Row #${rowNum} (${item.sku}): Unit Cost cannot be negative.`);
+    }
+  }
+
   const newNote: MaterialInwardNote = {
     ...noteData,
     id: `min-${Date.now()}`,
@@ -110,9 +144,29 @@ export async function createInwardNote(noteData: Omit<MaterialInwardNote, 'id'>)
         include: { items: true },
       });
 
-      // Update product stocks, costs, and selling prices
+      // Create batch records and update product stocks, costs, and selling prices
       if (newNote.items && Array.isArray(newNote.items)) {
         for (const item of newNote.items) {
+          const bNo = item.batchNo || `B-${Math.floor(1000 + Math.random() * 9000)}`;
+          const barcodeVal = `BC-${item.sku}-${bNo}`;
+          
+          await prisma.batch.create({
+            data: {
+              batchNumber: bNo,
+              sku: item.sku,
+              productName: item.name,
+              purchaseCost: Number(item.unitCost),
+              sellingPrice: item.sellingPrice ? Number(item.sellingPrice) : null,
+              quantityReceived: Number(item.quantity),
+              currentStockBalance: Number(item.quantity),
+              inwardDate: newNote.invoiceDate || new Date().toISOString().slice(0, 10),
+              grnNumber: newNote.grnNumber,
+              barcodeValue: barcodeVal,
+              branchId: newNote.branchId,
+              branchName: newNote.branchName,
+            }
+          }).catch(err => console.warn('Prisma batch create warning:', err));
+
           const prod = await prisma.product.findUnique({ where: { sku: item.sku } });
           if (prod) {
             await prisma.product.update({
@@ -121,7 +175,7 @@ export async function createInwardNote(noteData: Omit<MaterialInwardNote, 'id'>)
                 stock: prod.stock + Number(item.quantity),
                 cost: item.unitCost ? Number(item.unitCost) : prod.cost,
                 price: item.sellingPrice ? Number(item.sellingPrice) : prod.price,
-                batchNo: item.batchNo || prod.batchNo,
+                batchNo: bNo,
                 lastUpdated: new Date(),
               },
             });
@@ -142,15 +196,36 @@ export async function createInwardNote(noteData: Omit<MaterialInwardNote, 'id'>)
   // Fallback to MemoryDb
   MemoryDb.inwardNotes.unshift(newNote);
 
-  // Automatically update product stock, cost, and selling price in MemoryDb
+  // Automatically update product stock, cost, selling price and create batches in MemoryDb
+  if (!MemoryDb.batches) MemoryDb.batches = [];
   if (newNote.items && Array.isArray(newNote.items)) {
     newNote.items.forEach((item: any) => {
+      const bNo = item.batchNo || `B-${Math.floor(1000 + Math.random() * 9000)}`;
+      const barcodeVal = `BC-${item.sku}-${bNo}`;
+
+      MemoryDb.batches.unshift({
+        id: `batch-${Date.now()}-${Math.random()}`,
+        batchNumber: bNo,
+        sku: item.sku,
+        productName: item.name,
+        purchaseCost: Number(item.unitCost),
+        sellingPrice: item.sellingPrice ? Number(item.sellingPrice) : null,
+        quantityReceived: Number(item.quantity),
+        currentStockBalance: Number(item.quantity),
+        inwardDate: newNote.invoiceDate || new Date().toISOString().slice(0, 10),
+        grnNumber: newNote.grnNumber,
+        barcodeValue: barcodeVal,
+        branchId: newNote.branchId,
+        branchName: newNote.branchName,
+        createdAt: new Date().toISOString()
+      });
+
       const prod = MemoryDb.products.find(p => p.sku === item.sku);
       if (prod) {
         prod.stock += Number(item.quantity);
         if (item.unitCost) prod.cost = Number(item.unitCost);
         if (item.sellingPrice) prod.price = Number(item.sellingPrice);
-        if (item.batchNo) prod.batchNo = item.batchNo;
+        prod.batchNo = bNo;
       }
     });
   }

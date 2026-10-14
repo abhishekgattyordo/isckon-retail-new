@@ -18,6 +18,7 @@ import { BIAnalytics } from '@/components/reports/BIAnalytics';
 import { SettingsPage } from '@/components/settings/SettingsPage';
 import { AuditLogPage } from '@/components/reports/AuditLogPage';
 import { RecycleBinPage } from '@/components/recycle/RecycleBinPage';
+import { SupplierManagement } from '@/components/suppliers/SupplierManagement';
 
 export default function CatchAllPageClient({ initialModule }: { initialModule?: ModuleType | 'audit' } = {}) {
   const { activeModule, setActiveModule, user, currentBranch } = useERP();
@@ -97,6 +98,8 @@ export default function CatchAllPageClient({ initialModule }: { initialModule?: 
       return <POSTerminal />;
     case 'inward':
       return <MaterialInwardWizard />;
+    case 'suppliers':
+      return <SupplierManagement />;
     case 'products':
       return <ProductManagement />;
     case 'inventory':

@@ -5,6 +5,7 @@ export class MemoryDb {
   static branches: Branch[] = [];
   static products: Product[] = [];
   static inwardNotes: MaterialInwardNote[] = [];
+  static batches: any[] = [];
   static orders: POSOrder[] = [];
   static events: SalesEvent[] = [];
   static settings: SystemSettings | null = null;

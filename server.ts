@@ -318,10 +318,43 @@ app.post('/api/inward', async (req: Request, res: Response) => {
       const success = await restoreInwardNoteService(body.id);
       return res.json({ success });
     }
-    const inwardNote = await createInwardNote(body).catch(() => null);
+
+    // Strict Backend Validation
+    if (!body.vendorName || typeof body.vendorName !== 'string' || !body.vendorName.trim()) {
+      return res.status(400).json({ success: false, error: 'Validation Error: Supplier / Vendor Name is mandatory.' });
+    }
+    if (!body.poNumber || typeof body.poNumber !== 'string' || !body.poNumber.trim()) {
+      return res.status(400).json({ success: false, error: 'Validation Error: Purchase Order (PO) Number is mandatory.' });
+    }
+    if (!body.warehouse || typeof body.warehouse !== 'string' || !body.warehouse.trim()) {
+      return res.status(400).json({ success: false, error: 'Validation Error: Destination Warehouse Zone is mandatory.' });
+    }
+    if (!body.items || !Array.isArray(body.items) || body.items.length === 0) {
+      return res.status(400).json({ success: false, error: 'Validation Error: At least one product item row is mandatory.' });
+    }
+    for (let i = 0; i < body.items.length; i++) {
+      const it = body.items[i];
+      const rowNum = i + 1;
+      if (!it.sku || typeof it.sku !== 'string' || !it.sku.trim() || it.sku === 'SKU-UNASSIGNED') {
+        return res.status(400).json({ success: false, error: `Validation Error on Item #${rowNum}: Product SKU selection is mandatory.` });
+      }
+      if (!it.name || typeof it.name !== 'string' || !it.name.trim() || it.name === 'General Merchandise Item') {
+        return res.status(400).json({ success: false, error: `Validation Error on Item #${rowNum}: Product Name is mandatory.` });
+      }
+      const q = Number(it.quantity);
+      if (isNaN(q) || q <= 0) {
+        return res.status(400).json({ success: false, error: `Validation Error on Item #${rowNum} (${it.sku}): Quantity must be a valid number greater than 0.` });
+      }
+      const c = Number(it.unitCost);
+      if (isNaN(c) || c < 0) {
+        return res.status(400).json({ success: false, error: `Validation Error on Item #${rowNum} (${it.sku}): Unit Cost cannot be negative.` });
+      }
+    }
+
+    const inwardNote = await createInwardNote(body);
     res.status(201).json({ success: true, inwardNote });
   } catch (error: any) {
-    res.json({ success: true, error: error?.message });
+    res.status(400).json({ success: false, error: error?.message || 'Failed to create inward note' });
   }
 });
 

@@ -292,3 +292,23 @@ model StockMovement {
 
   @@map("stock_movements")
 }
+
+model Batch {
+  id                  String   @id @default(uuid())
+  batchNumber         String   @map("batch_number")
+  sku                 String
+  productName         String   @map("product_name")
+  purchaseCost        Float    @map("purchase_cost")
+  sellingPrice        Float?   @map("selling_price")
+  quantityReceived    Int      @map("quantity_received")
+  currentStockBalance Int      @map("current_stock_balance")
+  inwardDate          String?  @map("inward_date")
+  grnNumber           String   @map("grn_number")
+  barcodeValue        String?  @map("barcode_value")
+  branchId            String?  @map("branch_id")
+  branchName          String?  @map("branch_name")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  @@map("batches")
+}
+

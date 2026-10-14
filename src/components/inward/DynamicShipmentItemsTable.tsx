@@ -465,12 +465,13 @@ export const DynamicShipmentItemsTable: React.FC<DynamicShipmentItemsTableProps>
 
   // Remove specific row
   const handleRemoveRow = (rowId: string) => {
+    setRows(prev => prev.filter(r => r.id !== rowId));
+  };
+
+  // Clear rows that have no SKU entered
+  const handleClearEmptyRows = () => {
     setRows(prev => {
-      const filtered = prev.filter(r => r.id !== rowId);
-      // Keep at least one empty row ready for input
-      if (filtered.length === 0) {
-        return [createEmptyRow()];
-      }
+      const filtered = prev.filter(r => r.sku && r.sku.trim().length > 0);
       return filtered;
     });
   };
@@ -496,14 +497,27 @@ export const DynamicShipmentItemsTable: React.FC<DynamicShipmentItemsTableProps>
         </div>
 
         {!readOnly && (
-          <button
-            type="button"
-            onClick={handleAddRow}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-black hover:bg-neutral-800 text-white text-xs font-semibold tracking-wide transition-colors cursor-pointer shadow-sm self-start sm:self-auto"
-          >
-            <Plus className="w-4 h-4" />
-            <span>+ ADD SKU ROW</span>
-          </button>
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            {rows.some(r => !r.sku || !r.sku.trim()) && (
+              <button
+                type="button"
+                onClick={handleClearEmptyRows}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-mono font-semibold transition-colors cursor-pointer"
+                title="Remove any unassigned or empty rows"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-slate-500" />
+                <span>CLEAR EMPTY</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleAddRow}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-black hover:bg-neutral-800 text-white text-xs font-semibold tracking-wide transition-colors cursor-pointer shadow-sm"
+            >
+              <Plus className="w-4 h-4" />
+              <span>+ ADD SKU ROW</span>
+            </button>
+          </div>
         )}
       </div>
 
@@ -512,21 +526,58 @@ export const DynamicShipmentItemsTable: React.FC<DynamicShipmentItemsTableProps>
         <table className="w-full text-left border-collapse min-w-[1060px]">
           <thead>
             <tr className="bg-gray-50/90 dark:bg-slate-950/70 border-b border-gray-200 dark:border-slate-800 text-[11px] font-bold uppercase tracking-wider text-gray-600 dark:text-gray-400 font-mono h-12">
-              <th className="py-3 px-4 w-[21%] align-middle">SKU LOOKUP</th>
-              <th className="py-3 px-3 w-[22%] align-middle">PRODUCT DESCRIPTION</th>
-              <th className="py-3 px-3 w-[8%] text-center align-middle">QTY</th>
+              <th className="py-3 px-4 w-[21%] align-middle">
+                <span>SKU LOOKUP</span>
+                <span className="text-rose-500 font-bold ml-1" title="Mandatory Field">*</span>
+              </th>
+              <th className="py-3 px-3 w-[22%] align-middle">
+                <span>PRODUCT NAME</span>
+                <span className="text-rose-500 font-bold ml-1" title="Mandatory Field">*</span>
+              </th>
+              <th className="py-3 px-3 w-[8%] text-center align-middle">
+                <span>QTY</span>
+                <span className="text-rose-500 font-bold ml-1" title="Mandatory Field">*</span>
+              </th>
               <th className="py-3 px-3 w-[11%] align-middle">UNIT COST ({currencySymbol})</th>
               <th className="py-3 px-3 w-[11%] align-middle">SELLING PRICE ({currencySymbol})</th>
               <th className="py-3 px-3 w-[10%] align-middle">BATCH #</th>
               <th className="py-3 px-3 w-[8%] align-middle">TAX (%)</th>
               <th className="py-3 px-4 w-[11%] text-right align-middle">ROW TOTAL</th>
               {!readOnly && (
-                <th className="py-3 px-3 w-[5%] text-center align-middle">ACTIONS</th>
+                <th className="py-3 px-3 w-[5%] text-center align-middle">ACTION</th>
               )}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-slate-800/80 text-xs sm:text-sm">
-            {rows.map((row) => (
+            {rows.length === 0 ? (
+              <tr>
+                <td colSpan={readOnly ? 8 : 9} className="py-12 text-center">
+                  <div className="flex flex-col items-center justify-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-200 dark:border-amber-900/60">
+                      <Layers className="w-5 h-5" />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300">
+                        No product item rows in this shipment note
+                      </p>
+                      <p className="text-[11px] text-slate-400 font-mono">
+                        At least one product item with quantity &gt; 0 is required to proceed.
+                      </p>
+                    </div>
+                    {!readOnly && (
+                      <button
+                        type="button"
+                        onClick={handleAddRow}
+                        className="px-4 py-2 rounded-xl bg-black dark:bg-white text-white dark:text-black font-bold font-mono text-xs hover:opacity-90 shadow-sm cursor-pointer"
+                      >
+                        + Add First SKU Row
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ) : (
+              rows.map((row) => (
               <tr
                 key={row.id}
                 className="hover:bg-gray-50/70 dark:hover:bg-slate-800/40 transition-colors min-h-[60px] h-[64px]"
@@ -649,16 +700,15 @@ export const DynamicShipmentItemsTable: React.FC<DynamicShipmentItemsTableProps>
                     <button
                       type="button"
                       onClick={() => handleRemoveRow(row.id)}
-                      disabled={rows.length === 1 && !row.sku && !row.unitCost}
-                      className="p-2 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-400 cursor-pointer inline-flex items-center justify-center"
-                      title="Remove Row"
+                      className="p-2 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer inline-flex items-center justify-center"
+                      title="Delete this row"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </td>
                 )}
               </tr>
-            ))}
+            )))}
           </tbody>
         </table>
       </div>

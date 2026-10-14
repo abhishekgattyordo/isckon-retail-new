@@ -92,7 +92,7 @@ const isValidBarcodeValue = (text: string): boolean => {
 };
 
 export const POSTerminal: React.FC = () => {
-  const { products, orders, cart, addToCart, removeFromCart, updateCartQuantity, clearCart, addOrder, user, quickNotification, salesTags, addSalesTag, updateSalesTag, deleteSalesTag, settings, currentBranch } = useERP();
+  const { products, orders, cart, addToCart, removeFromCart, updateCartQuantity, clearCart, addOrder, user, quickNotification, salesTags, addSalesTag, updateSalesTag, deleteSalesTag, settings, currentBranch, barcodes, getActiveProductPrice } = useERP();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => {
@@ -224,6 +224,35 @@ export const POSTerminal: React.FC = () => {
 
     const cleanInputAlphaNum = toAlphaNum(cleanInput);
     const cleanInputDigits = toDigits(cleanInput);
+
+    // 0. CHECK BARCODES TABLE/COLLECTION FIRST (Batch-level barcode matching):
+    const matchedBarcodeRecord = barcodes.find(b => 
+      b.barcodeValue.toLowerCase() === cleanInput.toLowerCase() ||
+      b.barcodeValue === cleanInput
+    );
+
+    if (matchedBarcodeRecord) {
+      const targetProduct = products.find(p => p.sku === matchedBarcodeRecord.sku);
+      if (targetProduct) {
+        console.log(`[FRONTEND SCANNER] Batch barcode match found:`, matchedBarcodeRecord.barcodeValue, 'Batch:', matchedBarcodeRecord.batchNo);
+        playBeep();
+        addToCart(targetProduct, 1, {
+          batchId: matchedBarcodeRecord.batchId,
+          batchNo: matchedBarcodeRecord.batchNo,
+          unitPrice: matchedBarcodeRecord.sellingPrice || matchedBarcodeRecord.price,
+          purchaseCost: matchedBarcodeRecord.purchaseCost
+        });
+        setScannedProduct(null);
+        setProductNotFoundBarcode(null);
+        quickNotification(
+          'Batch Item Added',
+          `Added 1x ${targetProduct.name} [Batch: ${matchedBarcodeRecord.batchNo}] (₹${matchedBarcodeRecord.sellingPrice || matchedBarcodeRecord.price || targetProduct.price}) to cart.`,
+          'success'
+        );
+        if (onDone) onDone();
+        return;
+      }
+    }
 
     // 1. FAST LOCAL SYNC MATCH: Exact match by SKU or Barcode first (Product scan priority)
     const foundProduct = products.find(p => 
@@ -1118,7 +1147,9 @@ export const POSTerminal: React.FC = () => {
           {viewMode === 'grid' ? (
             /* Product Cards Grid with Thumbnails */
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 max-h-[620px] overflow-y-auto pr-1">
-              {filteredProducts.map(product => (
+              {filteredProducts.map(product => {
+                const activePrice = getActiveProductPrice(product);
+                return (
                 <div
                   key={product.id}
                   onClick={() => addToCart(product, 1)}
@@ -1156,14 +1187,14 @@ export const POSTerminal: React.FC = () => {
                       <div>
                         {activeTag && activeTag.discount > 0 ? (
                           <div className="flex flex-col">
-                            <span className="text-[10px] text-[#786C65] line-through font-mono">{settings.currencySymbol}{product.price.toFixed(2)}</span>
+                            <span className="text-[10px] text-[#786C65] line-through font-mono">{settings.currencySymbol}{activePrice.toFixed(2)}</span>
                             <span className="font-bold font-mono text-xs text-[#15803D]">
-                              {settings.currencySymbol}{(product.price * (1 - activeTag.discount / 100)).toFixed(2)}
+                              {settings.currencySymbol}{(activePrice * (1 - activeTag.discount / 100)).toFixed(2)}
                             </span>
                           </div>
                         ) : (
                           <span className="font-bold font-mono text-xs text-[#1F1916] dark:text-white">
-                            {settings.currencySymbol}{product.price.toFixed(2)}
+                            {settings.currencySymbol}{activePrice.toFixed(2)}
                           </span>
                         )}
                       </div>
@@ -1173,7 +1204,7 @@ export const POSTerminal: React.FC = () => {
                     </div>
                   </div>
                 </div>
-              ))}
+              );})}
               {filteredProducts.length === 0 && (
                 <div className="col-span-full py-16 text-center text-[#6B7280] text-sm">
                   No items found matching criteria. Scan barcode or adjust filters.
@@ -1184,9 +1215,10 @@ export const POSTerminal: React.FC = () => {
             /* Product List View */
             <div className="space-y-2 max-h-[620px] overflow-y-auto pr-1">
               {filteredProducts.map(product => {
+                const activePrice = getActiveProductPrice(product);
                 const discountedPrice = activeTag && activeTag.discount > 0
-                  ? product.price * (1 - activeTag.discount / 100)
-                  : product.price;
+                  ? activePrice * (1 - activeTag.discount / 100)
+                  : activePrice;
                 const inCart = cart.find(item => item.product.id === product.id);
 
                 return (
@@ -1244,7 +1276,7 @@ export const POSTerminal: React.FC = () => {
                         {activeTag && activeTag.discount > 0 ? (
                           <div className="flex flex-col sm:items-end">
                             <span className="text-[10px] text-[#786C65] line-through font-mono">
-                              {settings.currencySymbol}{product.price.toFixed(2)}
+                              {settings.currencySymbol}{activePrice.toFixed(2)}
                             </span>
                             <span className="font-bold font-mono text-sm text-[#15803D]">
                               {settings.currencySymbol}{discountedPrice.toFixed(2)}
@@ -1252,7 +1284,7 @@ export const POSTerminal: React.FC = () => {
                           </div>
                         ) : (
                           <span className="font-bold font-mono text-sm text-[#1F1916] dark:text-white">
-                            {settings.currencySymbol}{product.price.toFixed(2)}
+                            {settings.currencySymbol}{activePrice.toFixed(2)}
                           </span>
                         )}
                       </div>

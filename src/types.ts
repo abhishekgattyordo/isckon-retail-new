@@ -2,6 +2,7 @@ export type ModuleType =
   | 'dashboard'
   | 'products'
   | 'inward'
+  | 'suppliers'
   | 'inventory'
   | 'barcode'
   | 'pos'
@@ -78,6 +79,7 @@ export interface InwardItem {
   unitCost: number;
   sellingPrice?: number; // Retail sales price entered during inward
   batchNo: string;
+  batchId?: string;
   expiryDate: string;
   taxRate: number; // GST percentage e.g., 5 or 12 or 18
   total: number;
@@ -142,6 +144,11 @@ export interface BarcodeRecord {
   printCount: number;
   branchId?: string;
   branchName?: string;
+  grnNumber?: string;
+  price?: number;
+  batchId?: string;
+  purchaseCost?: number;
+  sellingPrice?: number;
 }
 
 export interface CartItem {
@@ -149,6 +156,10 @@ export interface CartItem {
   quantity: number;
   discountPercent: number;
   customNote?: string;
+  batchId?: string;
+  batchNo?: string;
+  unitPrice?: number;
+  purchaseCost?: number;
 }
 
 export interface SalesTag {
@@ -329,5 +340,22 @@ export interface EventTransaction {
   paymentMethod: 'cash' | 'upi';
   timestamp: string;
   cashierName: string;
+}
+
+export interface Supplier {
+  id: string;
+  code: string;
+  supplierName: string;
+  contactPerson: string;
+  email: string;
+  phone: string;
+  address: string;
+  gstin: string;
+  paymentTerms: string;
+  performanceRating: number;
+  status: 'active' | 'inactive';
+  category: string;
+  notes?: string;
+  createdAt: string;
 }
 

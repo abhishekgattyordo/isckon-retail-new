@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import JsBarcode from 'jsbarcode';
 
 export interface EventExportData {
   event: {
@@ -620,3 +621,635 @@ export function exportBIAnalyticsToCsv(data: BIAnalyticsExportData) {
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
+
+/**
+ * Generate a base64 PNG data URL for any barcode value using JsBarcode
+ */
+export function generateBarcodeDataUrl(value: string, format: string = 'CODE128'): string {
+  if (typeof document === 'undefined') return '';
+  const canvas = document.createElement('canvas');
+  const cleanVal = String(value || '').trim() || '1234567890123';
+  try {
+    let detectedFormat = format;
+    if (format === 'auto' || !format) {
+      if (/^\d{13}$/.test(cleanVal)) detectedFormat = 'EAN13';
+      else if (/^\d{8}$/.test(cleanVal)) detectedFormat = 'EAN8';
+      else if (/^\d{12}$/.test(cleanVal)) detectedFormat = 'UPC';
+      else detectedFormat = 'CODE128';
+    }
+    JsBarcode(canvas, cleanVal, {
+      format: detectedFormat as any,
+      width: 2,
+      height: 44,
+      displayValue: true,
+      fontSize: 11,
+      font: 'monospace',
+      margin: 3,
+      background: '#ffffff',
+      lineColor: '#000000',
+    });
+    return canvas.toDataURL('image/png');
+  } catch {
+    try {
+      JsBarcode(canvas, cleanVal, {
+        format: 'CODE128',
+        width: 2,
+        height: 44,
+        displayValue: true,
+        fontSize: 11,
+        font: 'monospace',
+        margin: 3,
+      });
+      return canvas.toDataURL('image/png');
+    } catch {
+      return '';
+    }
+  }
+}
+
+export interface GrnExportData {
+  grnNumber: string;
+  poNumber?: string;
+  vendorName: string;
+  invoiceDate: string;
+  warehouse: string;
+  branchName?: string;
+  receivedBy?: string;
+  totalValue: number;
+  notes?: string;
+  items: Array<{
+    id?: string;
+    sku: string;
+    name: string;
+    quantity: number;
+    unitCost: number;
+    sellingPrice?: number;
+    batchNo: string;
+    expiryDate?: string;
+    taxRate?: number;
+    total: number;
+    barcode?: string;
+  }>;
+  settings?: {
+    orgName?: string;
+    appTitle?: string;
+    currencySymbol?: string;
+  };
+}
+
+/**
+ * Export complete GRN Voucher (Page 1) and all Batch Barcode Stickers (Page 2+) into a unified PDF
+ */
+export function exportGrnBarcodesToPdf(data: GrnExportData) {
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4'
+  });
+
+  const pageWidth = 210;
+  const pageHeight = 297;
+  const orgName = data.settings?.orgName || 'ISKCON Foundation';
+  const appTitle = data.settings?.appTitle || 'ISKCON Retail ERP';
+  const currencySymbol = data.settings?.currencySymbol || '₹';
+
+  // ---------------- PAGE 1: OFFICIAL GRN VOUCHER ----------------
+  // Header Banner
+  doc.setFillColor(15, 23, 42); // slate-900
+  doc.rect(0, 0, pageWidth, 28, 'F');
+
+  // Accent Saffron Stripe
+  doc.setFillColor(217, 119, 6); // amber-600
+  doc.rect(0, 28, pageWidth, 2.5, 'F');
+
+  // Header Title
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(13);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`${orgName.toUpperCase()} — GOODS RECEIVED NOTE`, 14, 12);
+
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(245, 158, 11);
+  doc.text('OFFICIAL INWARD RECEIPT & SERIALIZED BARCODE VOUCHER', 14, 19);
+
+  doc.setFontSize(7.5);
+  doc.setTextColor(148, 163, 184);
+  doc.text(`DATE GENERATED: ${new Date().toLocaleString('en-IN')}`, 14, 25);
+
+  // GRN Barcode at top right
+  const grnBarcodeImg = generateBarcodeDataUrl(data.grnNumber, 'CODE128');
+  if (grnBarcodeImg) {
+    try {
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(pageWidth - 62, 5, 50, 18, 1.5, 1.5, 'F');
+      doc.addImage(grnBarcodeImg, 'PNG', pageWidth - 60, 6, 46, 16);
+    } catch {
+      // fallback
+    }
+  }
+
+  // GRN Metadata Bento Boxes
+  const startY = 36;
+  const boxWidth = (pageWidth - 28 - 6) / 2; // 85mm each
+
+  // Box 1: Document & Vendor Details
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(14, startY, boxWidth, 30, 2, 2, 'FD');
+
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(71, 85, 105);
+  doc.text('DOCUMENT & SUPPLIER IDENTIFICATION', 18, startY + 6);
+
+  doc.setFontSize(7.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 116, 139);
+  doc.text(`GRN Document Number:`, 18, startY + 12);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(15, 23, 42);
+  doc.text(data.grnNumber, 62, startY + 12);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 116, 139);
+  doc.text(`PO Reference Number:`, 18, startY + 17);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(15, 23, 42);
+  doc.text(data.poNumber || 'N/A', 62, startY + 17);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 116, 139);
+  doc.text(`Vendor / Supplier Name:`, 18, startY + 22);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(15, 23, 42);
+  doc.text(data.vendorName || 'General Supplier', 62, startY + 22);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 116, 139);
+  doc.text(`Supplier Invoice Date:`, 18, startY + 27);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(15, 23, 42);
+  doc.text(data.invoiceDate || new Date().toISOString().slice(0, 10), 62, startY + 27);
+
+  // Box 2: Branch & Receiving Logistics
+  const box2X = 14 + boxWidth + 6;
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(box2X, startY, boxWidth, 30, 2, 2, 'FD');
+
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(71, 85, 105);
+  doc.text('BRANCH & LOGISTICS WAREHOUSE', box2X + 4, startY + 6);
+
+  doc.setFontSize(7.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 116, 139);
+  doc.text(`Receiving Temple Branch:`, box2X + 4, startY + 12);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(15, 23, 42);
+  doc.text(data.branchName || 'Central Branch', box2X + 44, startY + 12);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 116, 139);
+  doc.text(`Warehouse Zone:`, box2X + 4, startY + 17);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(15, 23, 42);
+  doc.text((data.warehouse || 'Zone A').split('—')[0].trim(), box2X + 44, startY + 17);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 116, 139);
+  doc.text(`Received By Officer:`, box2X + 4, startY + 22);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(15, 23, 42);
+  doc.text(data.receivedBy || 'Store In-Charge', box2X + 44, startY + 22);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 116, 139);
+  doc.text(`Total GRN Valuation:`, box2X + 4, startY + 27);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(16, 185, 129); // emerald-600
+  doc.text(`${currencySymbol} ${data.totalValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, box2X + 44, startY + 27);
+
+  // Table of Items
+  const tableRows = data.items.map((item, idx) => [
+    (idx + 1).toString(),
+    item.sku,
+    item.name,
+    item.batchNo || 'N/A',
+    item.quantity.toString(),
+    `${currencySymbol}${item.unitCost.toFixed(2)}`,
+    `${currencySymbol}${(item.sellingPrice || item.unitCost * 1.5).toFixed(2)}`,
+    `${item.taxRate || 0}%`,
+    `${currencySymbol}${item.total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  ]);
+
+  const totalQty = data.items.reduce((sum, i) => sum + Number(i.quantity || 0), 0);
+
+  tableRows.push([
+    '',
+    'TOTALS',
+    `Total Products: ${data.items.length} items`,
+    '',
+    `${totalQty} Units`,
+    '',
+    '',
+    '',
+    `${currencySymbol}${data.totalValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  ]);
+
+  autoTable(doc, {
+    startY: startY + 34,
+    head: [['#', 'SKU', 'Product Title', 'Batch No', 'Qty', 'Unit Cost', 'Sell Price', 'GST', 'Total Valuation']],
+    body: tableRows,
+    theme: 'grid',
+    styles: {
+      fontSize: 7.5,
+      cellPadding: 2,
+      textColor: [30, 41, 59]
+    },
+    headStyles: {
+      fillColor: [15, 23, 42],
+      textColor: [255, 255, 255],
+      fontStyle: 'bold'
+    },
+    columnStyles: {
+      0: { cellWidth: 8, halign: 'center' },
+      1: { cellWidth: 28, fontStyle: 'bold' },
+      2: { cellWidth: 50 },
+      3: { cellWidth: 24, fontStyle: 'italic' },
+      4: { cellWidth: 14, halign: 'center', fontStyle: 'bold' },
+      5: { cellWidth: 18, halign: 'right' },
+      6: { cellWidth: 18, halign: 'right' },
+      7: { cellWidth: 10, halign: 'center' },
+      8: { cellWidth: 22, halign: 'right', fontStyle: 'bold' }
+    },
+    didParseCell: (hookData) => {
+      // Bold and color the totals row
+      if (hookData.row.index === tableRows.length - 1) {
+        hookData.cell.styles.fillColor = [241, 245, 249];
+        hookData.cell.styles.fontStyle = 'bold';
+      }
+    }
+  });
+
+  // Get final Y after table
+  const finalTableY = (doc as any).lastAutoTable?.finalY || 160;
+
+  // Notes section if present
+  let currentY = finalTableY + 6;
+  if (data.notes) {
+    doc.setFillColor(254, 243, 199);
+    doc.setDrawColor(245, 158, 11);
+    doc.roundedRect(14, currentY, pageWidth - 28, 12, 1, 1, 'FD');
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(180, 83, 9);
+    doc.text('INTAKE REMARKS / SHIPMENT NOTES:', 18, currentY + 4.5);
+    doc.setFont('helvetica', 'normal');
+    doc.text(data.notes.slice(0, 140), 18, currentY + 8.5);
+    currentY += 16;
+  } else {
+    currentY += 4;
+  }
+
+  // Official Signature & Verification Blocks
+  if (currentY + 28 <= pageHeight - 12) {
+    const sigY = pageHeight - 34;
+    const sigWidth = (pageWidth - 28 - 12) / 3;
+
+    ['Received & Handled By', 'Store Manager Verification', 'Temple Admin Stamp & Approval'].forEach((title, idx) => {
+      const sigX = 14 + idx * (sigWidth + 6);
+      doc.setDrawColor(203, 213, 225);
+      doc.line(sigX, sigY + 16, sigX + sigWidth, sigY + 16);
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(100, 116, 139);
+      doc.text(title.toUpperCase(), sigX, sigY + 20);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6.5);
+      doc.text(idx === 0 ? (data.receivedBy || 'Staff') : 'Authorized Signatory', sigX, sigY + 24);
+    });
+  }
+
+  // ---------------- PAGE 2+: SERIALIZED BARCODE LABELS SHEET ----------------
+  doc.addPage();
+
+  // Labels Sheet Header
+  doc.setFillColor(217, 119, 6); // amber-600
+  doc.rect(0, 0, pageWidth, 20, 'F');
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`GRN ${data.grnNumber} — SERIALIZED BARCODE STICKER SHEET`, 14, 9);
+
+  doc.setFontSize(7.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(254, 243, 199);
+  doc.text(`BATCH LABELS GENERATED FOR ${data.items.length} SKUs (${totalQty} TOTAL STOCK UNITS) • READY FOR THERMAL & LASER PRINTING`, 14, 15);
+
+  // Sticker Grid: 2 columns per row
+  const stickerW = 86;
+  const stickerH = 38;
+  const marginX = 14;
+  const gutterX = 10;
+  let stickerY = 26;
+  let currentCol = 0;
+
+  // Flatten items for printing (we print 1 representative sticker per batch/SKU, or all items)
+  data.items.forEach((item) => {
+    // Generate barcode data URL
+    const barcodeVal = item.barcode || `49000${Math.abs(item.sku.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) * 1234567).toString().padStart(8, '0').slice(0, 8)}`;
+    const barcodeDataUrl = generateBarcodeDataUrl(barcodeVal, 'CODE128');
+
+    // Check page overflow
+    if (stickerY + stickerH > pageHeight - 16) {
+      doc.addPage();
+      // Mini Header
+      doc.setFillColor(15, 23, 42);
+      doc.rect(0, 0, pageWidth, 12, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`GRN ${data.grnNumber} — BARCODE STICKER SHEET (CONTINUED)`, 14, 8);
+      stickerY = 18;
+      currentCol = 0;
+    }
+
+    const curX = marginX + currentCol * (stickerW + gutterX);
+
+    // Sticker Outer Box
+    doc.setFillColor(255, 255, 255);
+    doc.setDrawColor(30, 41, 59);
+    doc.setLineWidth(0.4);
+    doc.roundedRect(curX, stickerY, stickerW, stickerH, 1.5, 1.5, 'FD');
+
+    // Header line inside sticker
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(15, 23, 42);
+    doc.text(orgName.slice(0, 26).toUpperCase(), curX + 3, stickerY + 5);
+
+    // Selling Price badge (black box with white text)
+    const sellPriceText = `${currencySymbol}${(item.sellingPrice || item.unitCost * 1.5).toFixed(2)}`;
+    doc.setFillColor(15, 23, 42);
+    doc.roundedRect(curX + stickerW - 24, stickerY + 2, 21, 5, 1, 1, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'bold');
+    doc.text(sellPriceText, curX + stickerW - 22, stickerY + 5.5);
+
+    // Product Title (truncated to 34 chars)
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(15, 23, 42);
+    const prodNameClean = item.name.length > 36 ? item.name.slice(0, 34) + '...' : item.name;
+    doc.text(prodNameClean, curX + 3, stickerY + 10);
+
+    // Barcode Image
+    if (barcodeDataUrl) {
+      try {
+        doc.addImage(barcodeDataUrl, 'PNG', curX + 3, stickerY + 11.5, stickerW - 6, 17);
+      } catch {
+        // fallback text
+        doc.setFontSize(7);
+        doc.setTextColor(100, 116, 139);
+        doc.text(barcodeVal, curX + 10, stickerY + 20);
+      }
+    }
+
+    // Sticker Bottom metadata
+    doc.setFontSize(6.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(71, 85, 105);
+    doc.text(`SKU: ${item.sku}`, curX + 3, stickerY + 32.5);
+
+    doc.setFont('helvetica', 'normal');
+    doc.text(`BATCH: ${item.batchNo}`, curX + 3, stickerY + 36);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(217, 119, 6);
+    doc.text(`QTY: ${item.quantity} | ${data.grnNumber}`, curX + stickerW - 36, stickerY + 36);
+
+    // Advance column/row
+    if (currentCol === 0) {
+      currentCol = 1;
+    } else {
+      currentCol = 0;
+      stickerY += stickerH + 6;
+    }
+  });
+
+  const filename = `GRN_Voucher_${data.grnNumber}.pdf`;
+  doc.save(filename);
+}
+
+export interface BulkBarcodeExportData {
+  title?: string;
+  subtitle?: string;
+  repeatByQuantity?: boolean;
+  items: Array<{
+    sku: string;
+    productName: string;
+    barcodeValue: string;
+    batchNo: string;
+    price?: number;
+    grnNumber?: string;
+    printCount?: number;
+  }>;
+  settings?: {
+    orgName?: string;
+    appTitle?: string;
+    currencySymbol?: string;
+  };
+}
+
+/**
+ * Bulk export filtered barcodes (by GRN or Batch) into an A4 print-ready PDF sticker sheet
+ */
+export function exportBarcodesToPdf(data: BulkBarcodeExportData) {
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4'
+  });
+
+  const pageWidth = 210;
+  const pageHeight = 297;
+  const orgName = data.settings?.orgName || 'ISKCON Foundation';
+  const currencySymbol = data.settings?.currencySymbol || '₹';
+
+  // Header Banner
+  doc.setFillColor(15, 23, 42); // slate-900
+  doc.rect(0, 0, pageWidth, 22, 'F');
+
+  doc.setFillColor(217, 119, 6); // amber-600
+  doc.rect(0, 22, pageWidth, 2, 'F');
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
+  doc.text(data.title || `${orgName.toUpperCase()} — BATCH BARCODE LABELS`, 14, 11);
+
+  // Flatten items if repeatByQuantity is enabled
+  const itemsToRender: Array<{
+    sku: string;
+    productName: string;
+    barcodeValue: string;
+    batchNo: string;
+    price?: number;
+    grnNumber?: string;
+    printCount?: number;
+    unitIndex?: number;
+    totalUnits?: number;
+  }> = [];
+
+  data.items.forEach(item => {
+    if (data.repeatByQuantity && item.printCount && item.printCount > 1) {
+      const count = Math.min(item.printCount, 50); // safety cap
+      for (let i = 1; i <= count; i++) {
+        itemsToRender.push({
+          ...item,
+          unitIndex: i,
+          totalUnits: item.printCount
+        });
+      }
+    } else {
+      itemsToRender.push({
+        ...item,
+        unitIndex: 1,
+        totalUnits: item.printCount || 1
+      });
+    }
+  });
+
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(245, 158, 11);
+  doc.text(
+    data.subtitle || `BULK EXPORT OF ${itemsToRender.length} SERIALIZED MERCHANDISE BARCODES • ${new Date().toLocaleString('en-IN')}`,
+    14,
+    18
+  );
+
+  const stickerW = 86;
+  const stickerH = 38;
+  const marginX = 14;
+  const gutterX = 10;
+  let stickerY = 30;
+  let currentCol = 0;
+
+  itemsToRender.forEach((item) => {
+    const barcodeDataUrl = generateBarcodeDataUrl(item.barcodeValue, 'CODE128');
+
+    if (stickerY + stickerH > pageHeight - 14) {
+      doc.addPage();
+      doc.setFillColor(15, 23, 42);
+      doc.rect(0, 0, pageWidth, 12, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${(data.title || 'BARCODE LABELS').toUpperCase()} (CONTINUED)`, 14, 8);
+      stickerY = 18;
+      currentCol = 0;
+    }
+
+    const curX = marginX + currentCol * (stickerW + gutterX);
+
+    // Sticker Outer Box
+    doc.setFillColor(255, 255, 255);
+    doc.setDrawColor(15, 23, 42);
+    doc.setLineWidth(0.4);
+    doc.roundedRect(curX, stickerY, stickerW, stickerH, 1.5, 1.5, 'FD');
+
+    // Header row
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(15, 23, 42);
+    doc.text(orgName.slice(0, 28).toUpperCase(), curX + 3, stickerY + 5);
+
+    // Price badge if provided
+    if (item.price !== undefined && item.price > 0) {
+      const priceText = `${currencySymbol}${item.price.toFixed(2)}`;
+      doc.setFillColor(15, 23, 42);
+      doc.roundedRect(curX + stickerW - 24, stickerY + 2, 21, 5, 1, 1, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'bold');
+      doc.text(priceText, curX + stickerW - 22, stickerY + 5.5);
+    }
+
+    // Product Title
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(15, 23, 42);
+    const prodNameClean = item.productName.length > 36 ? item.productName.slice(0, 34) + '...' : item.productName;
+    doc.text(prodNameClean, curX + 3, stickerY + 10);
+
+    // Barcode Image
+    if (barcodeDataUrl) {
+      try {
+        doc.addImage(barcodeDataUrl, 'PNG', curX + 3, stickerY + 11.5, stickerW - 6, 17);
+      } catch {
+        doc.setFontSize(7);
+        doc.setTextColor(100, 116, 139);
+        doc.text(item.barcodeValue, curX + 10, stickerY + 20);
+      }
+    }
+
+    // Metadata footer
+    doc.setFontSize(6.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(71, 85, 105);
+    doc.text(`SKU: ${item.sku}`, curX + 3, stickerY + 32.5);
+
+    doc.setFont('helvetica', 'normal');
+    doc.text(`BATCH: ${item.batchNo || 'N/A'}`, curX + 3, stickerY + 36);
+
+    if (item.grnNumber) {
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(217, 119, 6);
+      doc.text(`GRN: ${item.grnNumber}`, curX + stickerW - 32, stickerY + 36);
+    } else if (item.printCount) {
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(217, 119, 6);
+      doc.text(`QTY: ${item.unitIndex || 1}/${item.totalUnits || item.printCount}`, curX + stickerW - 28, stickerY + 36);
+    }
+
+    // Move next column / row
+    if (currentCol === 0) {
+      currentCol = 1;
+    } else {
+      currentCol = 0;
+      stickerY += stickerH + 6;
+    }
+  });
+
+  const cleanTitle = (data.title || 'Barcodes').replace(/[^a-zA-Z0-9_-]/g, '_');
+  doc.save(`${cleanTitle}_Export.pdf`);
+}
+
+/**
+ * Export only the serialized barcode sticker sheet for a specific GRN
+ */
+export function exportGrnBarcodesOnlyToPdf(data: GrnExportData, repeatByQuantity: boolean = false) {
+  exportBarcodesToPdf({
+    title: `GRN ${data.grnNumber} — Barcode Stickers`,
+    subtitle: `Batch stickers for ${data.items.length} SKUs (${data.items.reduce((sum, i) => sum + (i.quantity || 0), 0)} units) • ${data.warehouse}`,
+    repeatByQuantity,
+    items: data.items.map(item => ({
+      sku: item.sku,
+      productName: item.name,
+      barcodeValue: item.barcode || `49000${Math.abs(item.sku.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) * 1234567).toString().padStart(8, '0').slice(0, 8)}`,
+      batchNo: item.batchNo,
+      price: item.sellingPrice || item.unitCost * 1.5,
+      grnNumber: data.grnNumber,
+      printCount: item.quantity
+    })),
+    settings: data.settings
+  });
+}
+
+

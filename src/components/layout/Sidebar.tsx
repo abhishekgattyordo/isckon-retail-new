@@ -27,7 +27,8 @@ import {
   Users,
   Settings,
   Flame,
-  Trash2
+  Trash2,
+  Building2
 } from 'lucide-react';
 
 interface NavItem {
@@ -57,7 +58,8 @@ const NAV_GROUPS: NavGroup[] = [
     title: 'Core Operations',
     items: [
       { id: 'pos', label: 'POS Checkout', icon: ShoppingCart, iconColor: 'text-[#D97706]', iconBg: 'bg-amber-50', badge: 'Live', badgeColor: 'bg-emerald-50 text-[#15803D]' },
-      { id: 'inward', label: 'Material Inward (GRN)', icon: FileSpreadsheet, iconColor: 'text-[#D97706]', iconBg: 'bg-amber-50' }
+      { id: 'inward', label: 'Material Inward (GRN)', icon: FileSpreadsheet, iconColor: 'text-[#D97706]', iconBg: 'bg-amber-50' },
+      { id: 'suppliers' as any, label: 'Suppliers & Vendors', icon: Building2, iconColor: 'text-[#D97706]', iconBg: 'bg-amber-50' }
     ]
   },
   {
