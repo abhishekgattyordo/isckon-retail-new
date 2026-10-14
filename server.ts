@@ -763,9 +763,15 @@ async function startServer() {
     app.use(vite.middlewares);
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server listening at http://0.0.0.0:${PORT}`);
-  });
+  // Only listen in non-production environments
+  if (process.env.NODE_ENV !== 'production') {
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Server listening at http://0.0.0.0:${PORT}`);
+    });
+  }
 }
 
 startServer();
+
+// Export for Vercel
+export default app;

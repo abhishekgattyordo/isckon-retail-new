@@ -71,12 +71,14 @@ export const BarcodeManager: React.FC = () => {
     }
   };
 
-  const selectedProd = products.find(p => p.id === selectedProductId) || products[0];
+  const selectedProd = products.find(p => p.id === selectedProductId) || (products.length > 0 ? products[0] : undefined);
 
   // Keep custom serial/batch aligned with product default batch in single view
   useEffect(() => {
     if (selectedProd) {
       setCustomSerial(selectedProd.batchNo);
+    } else {
+      setCustomSerial('');
     }
   }, [selectedProductId, selectedProd]);
 
